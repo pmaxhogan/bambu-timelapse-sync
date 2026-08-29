@@ -5,6 +5,7 @@ set -uo pipefail
 DATA_DIR="${DATA_DIR:-/data}"
 SYNC_INTERVAL="${SYNC_INTERVAL:-3600}"
 RUN_ON_START="${RUN_ON_START:-true}"
+RETRY_INTERVAL="${RETRY_INTERVAL:-300}"
 STAMP=/tmp/last-successful-sync
 
 log() { printf '%s  %s\n' "$(date -Is)" "$*"; }
@@ -45,13 +46,19 @@ while ! $terminate; do
     else
         if /usr/local/bin/sync.sh; then
             date -Is >"$STAMP"
+            nap=$SYNC_INTERVAL
         else
-            log "sync pass reported errors; will try again next interval"
+            # A failed pass usually means the printer is asleep or the network
+            # was not ready yet, so back off briefly rather than idling out the
+            # whole interval.
+            nap=$SYNC_INTERVAL
+            [ "$RETRY_INTERVAL" -gt 0 ] && [ "$RETRY_INTERVAL" -lt "$nap" ] && nap=$RETRY_INTERVAL
+            log "sync pass reported errors; retrying in ${nap}s"
         fi
     fi
     first=false
     $terminate && break
-    sleep "$SYNC_INTERVAL" &
+    sleep "${nap:-$SYNC_INTERVAL}" &
     napper=$!
     wait "$napper" 2>/dev/null
     napper=

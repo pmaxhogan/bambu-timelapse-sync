@@ -67,6 +67,7 @@ Everything is set through environment variables.
 | `ACCESS_CODE` | *required* | LAN access code from the printer screen. |
 | `SYNC_INTERVAL` | `3600` | Seconds between passes. `0` runs one pass and exits, which is handy for a host cron or a one-off catch-up. |
 | `RUN_ON_START` | `true` | Sync immediately on startup instead of waiting out the first interval. |
+| `RETRY_INTERVAL` | `300` | Seconds to wait after a failed pass, instead of idling out a whole interval. `0` disables the shorter retry. |
 | `SETTLE_SECONDS` | `15` | Gap between the two listings used to detect a print that is still recording. |
 | `LAYOUT` | `month` | `month` files into `videos/YYYY-MM/`; `flat` puts everything in one directory. |
 | `DOWNLOAD_THUMBNAILS` | `true` | Also copy the preview images. |
