@@ -17,6 +17,9 @@ deletes it from the printer.
 - **Grabs the thumbnails too**, so nothing is orphaned on the card.
 - **Safe to run repeatedly.** Files already stored are skipped, and overlapping
   runs cannot happen.
+- **Gentle with the printer.** Its FTP server allows only a handful of sessions
+  and is slow to release them, so transfers and deletes are batched down a
+  reused connection instead of opening one per file.
 
 It talks to the printer over the same implicit FTPS service on port 990 that
 Bambu Studio itself uses — no cloud account, no Bambu API, nothing leaves your
@@ -69,6 +72,9 @@ Everything is set through environment variables.
 | `RUN_ON_START` | `true` | Sync immediately on startup instead of waiting out the first interval. |
 | `RETRY_INTERVAL` | `300` | Seconds to wait after a failed pass, instead of idling out a whole interval. `0` disables the shorter retry. |
 | `SETTLE_SECONDS` | `15` | Gap between the two listings used to detect a print that is still recording. |
+| `BATCH_SIZE` | `20` | How many timelapses share one FTP connection. The printer allows only a few sessions at a time, so lower this if you see connection refusals. |
+| `BATCH_PAUSE` | `3` | Seconds to rest between batches, to let the printer release sessions. |
+| `MAX_ATTEMPTS` | `4` | How many times to retry a request the printer refuses, with a growing backoff. |
 | `LAYOUT` | `month` | `month` files into `videos/YYYY-MM/`; `flat` puts everything in one directory. |
 | `DOWNLOAD_THUMBNAILS` | `true` | Also copy the preview images. |
 | `KEEP_REMOTE` | `false` | Download only; never delete anything from the printer. |
@@ -113,6 +119,13 @@ directory, so you can move, rename, or archive anything at any time.
 **`cannot list /timelapse`** — the printer is asleep, unreachable, or the access
 code is wrong. Check that the printer answers on port 990 from wherever the
 container runs.
+
+**`421 There are too many connections from your internet address`** — the
+printer has run out of FTP sessions and will refuse everything, including Bambu
+Studio, until it frees them. It recovers on its own after a few minutes, or
+immediately if you restart it. Anything that opens a connection meanwhile,
+including a manual test, keeps it starved. Lower `BATCH_SIZE` and raise
+`BATCH_PAUSE` if it happens repeatedly.
 
 **Files download but are never deleted** — `KEEP_REMOTE` is on, or the delete is
 being refused. The log distinguishes the two, and a local copy is always kept
