@@ -1,4 +1,4 @@
-FROM alpine:3.22
+FROM alpine:3.24
 
 # bash    - the sync scripts use arrays and [[ ]]
 # curl    - speaks the implicit FTPS the printer serves on 990

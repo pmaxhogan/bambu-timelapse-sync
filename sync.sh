@@ -182,7 +182,11 @@ for ((i = 0; i < ${#needed[@]}; i += BATCH_SIZE)); do
     done
 
     log "fetching ${#batch[@]} timelapse(s)..."
-    curl_retry "${args[@]}"   # the per-file size checks below are the real gate
+    # Deliberately one attempt: retrying would re-fetch the whole batch to
+    # recover one file, and hammer the sessions this is trying to conserve.
+    # The per-file size checks below are the real gate, and whatever misses
+    # is simply picked up by the next pass.
+    curl_ftp "${args[@]}"
 
     for name in "${batch[@]}"; do
         target=$(video_path "$name")
