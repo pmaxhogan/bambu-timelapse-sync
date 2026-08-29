@@ -8,7 +8,7 @@ RUN_ON_START="${RUN_ON_START:-true}"
 RETRY_INTERVAL="${RETRY_INTERVAL:-300}"
 STAMP=/tmp/last-successful-sync
 
-log() { printf '%s  %s\n' "$(date -Is)" "$*"; }
+log() { printf '%s  %s\n' "$(date -Is)" "$*" >&2; }
 
 mkdir -p "$DATA_DIR"
 

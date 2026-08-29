@@ -30,7 +30,10 @@ KEEP_REMOTE_ON=false; is_true "${KEEP_REMOTE:-false}" && KEEP_REMOTE_ON=true
 THUMBNAILS_ON=true;   is_true "${DOWNLOAD_THUMBNAILS:-true}" || THUMBNAILS_ON=false
 LAYOUT="${LAYOUT:-month}"
 
-log() { printf '%s  %s\n' "$(date -Is)" "$*"; }
+# Logs go to stderr so that messages emitted from inside a command
+# substitution - the retry notices, most of all - still reach the container log
+# instead of being captured as if they were output.
+log() { printf '%s  %s\n' "$(date -Is)" "$*" >&2; }
 
 FTP="ftps://${PRINTER_HOST}:${PRINTER_PORT}"
 
