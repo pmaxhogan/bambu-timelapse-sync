@@ -118,7 +118,14 @@ done <<<"$second_pass"
 # which would otherwise cut a batch short.
 declare -A remote_thumbs=()
 if $THUMBNAILS_ON; then
-    thumb_listing=$(list_dir "$REMOTE_DIR/thumbnail")
+    # Abort rather than press on: without this listing the pass would delete
+    # videos while issuing no thumbnail deletes, and once a video is gone its
+    # thumbnail names can never be derived again, so they would be orphaned on
+    # the card permanently.
+    if ! thumb_listing=$(list_dir "$REMOTE_DIR/thumbnail"); then
+        log "ERROR: cannot list the thumbnails; stopping so that none are left orphaned"
+        exit 1
+    fi
     while IFS=$'\t' read -r name _; do
         [ -n "$name" ] && remote_thumbs["$name"]=1
     done <<<"$thumb_listing"
