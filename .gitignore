@@ -1,0 +1,4 @@
+timelapses/
+data/
+*.part
+.env

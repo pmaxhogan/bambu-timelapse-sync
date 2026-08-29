@@ -1,0 +1,5 @@
+ignored:
+  # Alpine does not keep old package versions in its repositories, so pinning
+  # them here guarantees the build breaks on the next Alpine point release.
+  # The base image tag is pinned instead, and Dependabot bumps it.
+  - DL3018
