@@ -111,6 +111,11 @@ directory, so you can move, rename, or archive anything at any time.
 - The printer presents a self-signed certificate, so the container does not
   verify it. Credentials still travel inside the TLS session, and the traffic
   never leaves your LAN.
+- The image is Debian-based on purpose. The printer requires TLS session reuse
+  on the FTPS data connection and answers `522 SSL connection failed: session
+  reuse required` to clients that skip it. curl 7.88 reuses the session; the
+  curl 8.x in current Alpine does not, so an Alpine build logs in happily and
+  then fails every transfer.
 - Timelapses only exist if timelapse recording is enabled in your print
   settings.
 

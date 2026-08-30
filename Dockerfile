@@ -1,10 +1,17 @@
-FROM alpine:3.24
+# Debian, not Alpine, and this is load-bearing: the printer requires TLS session
+# reuse on the FTPS data connection, and answers
+#   522 SSL connection failed: session reuse required
+# to clients that do not do it. curl 7.88 reuses the session; the curl 8.x that
+# Alpine ships does not, so an Alpine image can log in and then fail every
+# single transfer. Do not "simplify" this to alpine without testing a real
+# download against a real printer.
+FROM debian:bookworm-slim
 
-# bash    - the sync scripts use arrays and [[ ]]
-# curl    - speaks the implicit FTPS the printer serves on 990
-# coreutils - GNU date/stat; the busybox versions lack the flags used here
-# su-exec - drops to PUID/PGID when the host asks for specific ownership
-RUN apk add --no-cache bash curl coreutils su-exec tzdata
+# curl speaks the implicit FTPS the printer serves on 990; bash, coreutils and
+# setpriv (util-linux) are already in the base image.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl ca-certificates tzdata \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY sync.sh entrypoint.sh healthcheck.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/sync.sh /usr/local/bin/entrypoint.sh /usr/local/bin/healthcheck.sh

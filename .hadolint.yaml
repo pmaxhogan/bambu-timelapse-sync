@@ -1,5 +1,5 @@
 ignored:
-  # Alpine does not keep old package versions in its repositories, so pinning
-  # them here guarantees the build breaks on the next Alpine point release.
+  # Pinning apt package versions guarantees the build breaks the next time
+  # Debian issues a security update, which is worse than the drift it prevents.
   # The base image tag is pinned instead, and Dependabot bumps it.
-  - DL3018
+  - DL3008

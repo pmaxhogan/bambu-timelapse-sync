@@ -23,7 +23,7 @@ if [ -n "${PUID:-}" ] || [ -n "${PGID:-}" ]; then
         log "running syncs as ${uid}:${gid}"
         chown -R "${uid}:${gid}" "$DATA_DIR" 2>/dev/null || \
             log "warning: could not chown $DATA_DIR"
-        exec su-exec "${uid}:${gid}" \
+        exec setpriv --reuid "$uid" --regid "$gid" --clear-groups \
             env PUID= PGID= "$0" "$@"
     fi
 fi
