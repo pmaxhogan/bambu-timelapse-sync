@@ -57,8 +57,33 @@ by model). The access code is the 8-character string shown there. It changes if
 you regenerate it, at which point the container will log an authentication
 failure until you update the variable.
 
-The printer must have a stable address, so give it a DHCP reservation on your
-router before pointing the container at an IP.
+The printer needs a stable address. Either give it a DHCP reservation on your
+router, or turn on [discovery](#finding-the-printer-automatically) so the
+container follows it to whatever address it gets.
+
+### Finding the printer automatically
+
+Bambu printers announce themselves on the LAN every few seconds (a UDP
+broadcast on port 2021, the one Bambu Studio listens for). With
+`DISCOVER_PRINTER: true` the container listens for that announcement at the
+start of every pass and connects to whatever address the printer reports, so a
+new DHCP lease no longer breaks the sync.
+
+```yaml
+    network_mode: host              # broadcasts do not reach a bridge network
+    environment:
+      DISCOVER_PRINTER: true
+      PRINTER_SERIAL: 0123ABC456789 # optional; needed only with several printers
+      PRINTER_HOST: 192.168.1.50    # optional fallback
+      ACCESS_CODE: abcd1234
+```
+
+- **Host networking is required.** A container on the default bridge network
+  never sees LAN broadcasts, and discovery will time out every pass.
+- Without `PRINTER_SERIAL` the first Bambu printer heard is used. Set it if you
+  have more than one.
+- If nothing is heard, the pass falls back to the last address discovered, then
+  to `PRINTER_HOST`.
 
 ## Configuration
 
@@ -66,7 +91,11 @@ Everything is set through environment variables.
 
 | Variable | Default | What it does |
 | --- | --- | --- |
-| `PRINTER_HOST` | *required* | Printer IP or hostname. |
+| `PRINTER_HOST` | *required* | Printer IP or hostname. Optional with `DISCOVER_PRINTER`, where it becomes the fallback. |
+| `DISCOVER_PRINTER` | `false` | Find the printer by its LAN broadcast each pass instead of trusting a fixed address. Needs `network_mode: host`. |
+| `PRINTER_SERIAL` | unset | With discovery, only accept this printer. Unset accepts the first Bambu printer heard. |
+| `DISCOVERY_TIMEOUT` | `15` | Seconds to listen for the printer's announcement. |
+| `DISCOVERY_PORT` | `2021` | UDP port the announcements arrive on. |
 | `ACCESS_CODE` | *required* | LAN access code from the printer screen. |
 | `SYNC_INTERVAL` | `3600` | Seconds between passes. `0` runs one pass and exits, which is handy for a host cron or a one-off catch-up. |
 | `RUN_ON_START` | `true` | Sync immediately on startup instead of waiting out the first interval. |
@@ -124,6 +153,10 @@ directory, so you can move, rename, or archive anything at any time.
 **`cannot list /timelapse`** — the printer is asleep, unreachable, or the access
 code is wrong. Check that the printer answers on port 990 from wherever the
 container runs.
+
+**`no printer announcement heard`** — discovery is on but nothing arrived. The
+printer is off, or the container is not on host networking. Check from the host
+with `tcpdump -ni any udp port 2021`.
 
 **`421 There are too many connections from your internet address`** — the
 printer has run out of FTP sessions and will refuse everything, including Bambu

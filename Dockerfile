@@ -7,10 +7,11 @@
 # download against a real printer.
 FROM debian:bookworm-slim
 
-# curl speaks the implicit FTPS the printer serves on 990; bash, coreutils and
-# setpriv (util-linux) are already in the base image.
+# curl speaks the implicit FTPS the printer serves on 990; socat listens for the
+# printer's discovery broadcasts; bash, coreutils and setpriv (util-linux) are
+# already in the base image.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl ca-certificates tzdata \
+    && apt-get install -y --no-install-recommends curl ca-certificates tzdata socat \
     && rm -rf /var/lib/apt/lists/*
 
 COPY sync.sh entrypoint.sh healthcheck.sh /usr/local/bin/

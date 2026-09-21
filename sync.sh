@@ -11,7 +11,10 @@
 
 set -uo pipefail
 
-: "${PRINTER_HOST:?PRINTER_HOST is required - the printer IP or hostname}"
+is_true() { case "${1,,}" in true|1|yes|y|on) return 0 ;; *) return 1 ;; esac; }
+
+DISCOVER_ON=false;    is_true "${DISCOVER_PRINTER:-false}" && DISCOVER_ON=true
+$DISCOVER_ON || : "${PRINTER_HOST:?PRINTER_HOST is required - the printer IP or hostname - unless DISCOVER_PRINTER is on}"
 : "${ACCESS_CODE:?ACCESS_CODE is required - the LAN access code from the printer screen}"
 
 PRINTER_PORT="${PRINTER_PORT:-990}"
@@ -22,8 +25,10 @@ REMOTE_DIR="${REMOTE_DIR:-timelapse}"
 BATCH_SIZE="${BATCH_SIZE:-20}"
 BATCH_PAUSE="${BATCH_PAUSE:-3}"
 MAX_ATTEMPTS="${MAX_ATTEMPTS:-4}"
-
-is_true() { case "${1,,}" in true|1|yes|y|on) return 0 ;; *) return 1 ;; esac; }
+PRINTER_SERIAL="${PRINTER_SERIAL:-}"
+DISCOVERY_PORT="${DISCOVERY_PORT:-2021}"
+DISCOVERY_TIMEOUT="${DISCOVERY_TIMEOUT:-15}"
+HOST_CACHE=/tmp/printer-host
 
 DRY_RUN_ON=false;     is_true "${DRY_RUN:-false}" && DRY_RUN_ON=true
 KEEP_REMOTE_ON=false; is_true "${KEEP_REMOTE:-false}" && KEEP_REMOTE_ON=true
@@ -34,6 +39,59 @@ LAYOUT="${LAYOUT:-month}"
 # substitution - the retry notices, most of all - still reach the container log
 # instead of being captured as if they were output.
 log() { printf '%s  %s\n' "$(date -Is)" "$*" >&2; }
+
+# Bambu printers announce themselves every few seconds with an SSDP-style
+# NOTIFY broadcast on UDP 2021, carrying their current IP in "Location:" and
+# their serial in "USN:". Listening for one means a printer that moved to a new
+# DHCP lease is found again without anyone editing the config. Datagrams arrive
+# back to back on stdout, so each NOTIFY line starts a new one. Prints the IP.
+# Parsed with read rather than awk: Debian's mawk block-buffers a pipe and would
+# sit on a few small datagrams until the listen timed out.
+discover_printer() {
+    local want=${PRINTER_SERIAL^^} line name value ip='' usn='' bambu=false
+    local ipv4='([0-9]{1,3}\.){3}[0-9]{1,3}'
+    while IFS= read -r line; do
+        line=${line%$'\r'}
+        if [[ $line == NOTIFY\ * ]]; then
+            ip='' usn='' bambu=false
+            continue
+        fi
+        [[ $line == *:* ]] || continue
+        name=${line%%:*}; name=${name,,}
+        value=${line#*:}; value=${value#"${value%%[![:space:]]*}"}
+        [[ $name == *bambu* || $value == *bambulab* ]] && bambu=true
+        [ "$name" = usn ] && usn=${value^^}
+        [ "$name" = location ] && [[ $value =~ $ipv4 ]] && ip=${BASH_REMATCH[0]}
+        if [ -n "$ip" ] && $bambu && { [ -z "$want" ] || [[ $usn == *"$want"* ]]; }; then
+            printf '%s\n' "$ip"
+            return 0
+        fi
+    done < <(timeout "$DISCOVERY_TIMEOUT" socat -u "UDP4-RECV:${DISCOVERY_PORT},reuseaddr" STDOUT 2>/dev/null)
+    return 1
+}
+
+# Precedence: what the printer is announcing right now, then the last address
+# discovery found, then PRINTER_HOST. The cache lives in /tmp on purpose - a
+# restart falls back to the configured host and rediscovers from there.
+if $DISCOVER_ON; then
+    cached=$(cat "$HOST_CACHE" 2>/dev/null || true)
+    if found=$(discover_printer) && [ -n "$found" ]; then
+        if [ "$found" != "$cached" ]; then
+            log "discovered the printer${PRINTER_SERIAL:+ $PRINTER_SERIAL} at $found"
+            printf '%s\n' "$found" >"$HOST_CACHE"
+        fi
+        PRINTER_HOST=$found
+    elif [ -n "$cached" ]; then
+        PRINTER_HOST=$cached
+        log "no printer announcement heard in ${DISCOVERY_TIMEOUT}s; using the last address found, $cached"
+    elif [ -n "${PRINTER_HOST:-}" ]; then
+        log "no printer announcement heard in ${DISCOVERY_TIMEOUT}s; using PRINTER_HOST"
+    else
+        log "ERROR: no printer announcement heard in ${DISCOVERY_TIMEOUT}s and PRINTER_HOST is not set."
+        log "       Discovery needs host networking (network_mode: host) and a printer that is on."
+        exit 1
+    fi
+fi
 
 FTP="ftps://${PRINTER_HOST}:${PRINTER_PORT}"
 
